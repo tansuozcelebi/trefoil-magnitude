@@ -1,0 +1,29 @@
+# Server logs
+server.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Node modules (if added in future)
+node_modules/
+
+# Build directories (if added in future)
+dist/
+build/

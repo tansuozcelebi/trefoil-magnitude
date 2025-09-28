@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trefoil Knot - Legacy Version</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            color: white;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+        .legacy-notice {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #4a9eff;
+            max-width: 300px;
+            z-index: 1000;
+        }
+        .legacy-notice h3 {
+            color: #4a9eff;
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+        .legacy-notice p {
+            margin: 0 0 10px 0;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .legacy-notice a {
+            color: #ff6b35;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .legacy-notice a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div class="legacy-notice">
+        <h3>Legacy Version</h3>
+        <p>This is a simplified version of the Trefoil Knot Visualizer.</p>
+        <p>For the full interactive experience with advanced controls, please visit:</p>
+        <a href="index.html">Main Application</a>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r158/three.min.js"></script>
+    <script>
+        // Simple Three.js scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0);
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        // Basic lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0x4a9eff, 0.8);
+        directionalLight.position.set(10, 10, 5);
+        scene.add(directionalLight);
+
+        // Simple trefoil knot
+        function trefoilKnot(t) {
+            const magnitude = 2;
+            const A = 0.5;
+            const B = 0.5;
+            return new THREE.Vector3(
+                magnitude * (Math.sin(t) + A * Math.sin(3 * t)),
+                magnitude * (Math.cos(t) - A * Math.cos(3 * t)),
+                magnitude * B * Math.sin(2 * t)
+            );
+        }
+
+        // Create basic trefoil mesh
+        const points = [];
+        for (let i = 0; i <= 200; i++) {
+            const t = (i / 200) * 2 * Math.PI;
+            points.push(trefoilKnot(t));
+        }
+
+        const curve = new THREE.CatmullRomCurve3(points);
+        curve.closed = true;
+        
+        const tubeGeometry = new THREE.TubeGeometry(curve, 200, 0.15, 8, true);
+        const material = new THREE.MeshPhongMaterial({ 
+            color: 0x4a9eff,
+            shininess: 100 
+        });
+        
+        const trefoilMesh = new THREE.Mesh(tubeGeometry, material);
+        scene.add(trefoilMesh);
+
+        // Position camera
+        camera.position.z = 8;
+        camera.position.y = 3;
+        camera.position.x = 3;
+        camera.lookAt(0, 0, 0);
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            trefoilMesh.rotation.z += 0.01;
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

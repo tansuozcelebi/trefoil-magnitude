@@ -1,0 +1,18 @@
+{
+    "name": "Trefoil Knot Visualizer",
+    "short_name": "Trefoil",
+    "description": "An interactive 3D visualization of the trefoil knot with real-time parameter controls",
+    "start_url": "/index.html",
+    "display": "standalone",
+    "background_color": "#1a1a2e",
+    "theme_color": "#4a9eff",
+    "orientation": "any",
+    "categories": ["education", "entertainment", "utilities"],
+    "icons": [
+        {
+            "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%234a9eff' width='192' height='192' rx='20'/%3E%3Cpath fill='white' d='M96 48c-13.2 0-24 10.8-24 24s10.8 24 24 24 24-10.8 24-24-10.8-24-24-24zm0 32c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8z'/%3E%3C/svg%3E",
+            "sizes": "192x192",
+            "type": "image/svg+xml"
+        }
+    ]
+}

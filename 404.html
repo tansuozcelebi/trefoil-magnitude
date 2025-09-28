@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Page Not Found | Trefoil Knot Visualizer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            color: white;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .error-container {
+            text-align: center;
+            padding: 40px;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            border: 1px solid #4a9eff;
+            max-width: 500px;
+        }
+        h1 {
+            color: #4a9eff;
+            font-size: 72px;
+            margin: 0;
+            font-weight: bold;
+        }
+        h2 {
+            color: #ff6b35;
+            font-size: 24px;
+            margin: 20px 0;
+        }
+        p {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            color: #ccc;
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .nav-links a {
+            color: #4a9eff;
+            text-decoration: none;
+            padding: 10px 20px;
+            border: 1px solid #4a9eff;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+        .nav-links a:hover {
+            background: #4a9eff;
+            color: white;
+        }
+        @media (max-width: 600px) {
+            .error-container {
+                padding: 20px;
+                margin: 20px;
+            }
+            h1 {
+                font-size: 48px;
+            }
+            h2 {
+                font-size: 20px;
+            }
+            .nav-links {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <h1>404</h1>
+        <h2>Knot Found</h2>
+        <p>The page you're looking for has gotten tangled up somewhere in cyberspace. Don't worry, even the most complex knots can be untangled!</p>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="index.html">Main App</a>
+            <a href="trefoil_knot.html">Legacy Version</a>
+        </div>
+    </div>
+</body>
+</html>

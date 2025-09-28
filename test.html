@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trefoil Knot - Test Version</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            color: white;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        
+        .demo-container {
+            text-align: center;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            padding: 40px;
+            border: 1px solid #4a9eff;
+            max-width: 600px;
+        }
+        
+        .knot-preview {
+            width: 200px;
+            height: 200px;
+            margin: 20px auto;
+            background: radial-gradient(circle, #4a9eff, #2ecc71);
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .knot-preview::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            bottom: 20px;
+            border: 8px solid white;
+            border-radius: 50%;
+            opacity: 0.3;
+        }
+        
+        .knot-preview::after {
+            content: '🌀';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 60px;
+            animation: spin 4s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        
+        h1 {
+            color: #4a9eff;
+            margin-bottom: 20px;
+        }
+        
+        .feature-list {
+            text-align: left;
+            margin: 20px 0;
+        }
+        
+        .feature-list li {
+            margin: 8px 0;
+            color: #ccc;
+        }
+        
+        .status {
+            background: rgba(46, 204, 113, 0.2);
+            border: 1px solid #2ecc71;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .status h3 {
+            color: #2ecc71;
+            margin: 0 0 10px 0;
+        }
+        
+        .deploy-info {
+            background: rgba(255, 107, 53, 0.1);
+            border: 1px solid #ff6b35;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .deploy-info h3 {
+            color: #ff6b35;
+            margin: 0 0 10px 0;
+        }
+        
+        .links {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        
+        .links a {
+            color: #4a9eff;
+            text-decoration: none;
+            padding: 8px 16px;
+            border: 1px solid #4a9eff;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+        
+        .links a:hover {
+            background: #4a9eff;
+            color: white;
+        }
+        
+        @media (max-width: 600px) {
+            .demo-container {
+                margin: 20px;
+                padding: 20px;
+            }
+            
+            .knot-preview {
+                width: 150px;
+                height: 150px;
+            }
+            
+            .knot-preview::after {
+                font-size: 40px;
+            }
+            
+            .links {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1>🌀 Trefoil Knot Visualizer</h1>
+        
+        <div class="knot-preview"></div>
+        
+        <div class="status">
+            <h3>✅ Project Status: Ready for SiteGround Deployment</h3>
+            <p>All core files have been created and optimized for web hosting.</p>
+        </div>
+        
+        <div class="feature-list">
+            <h3>Features Included:</h3>
+            <ul>
+                <li>✅ Interactive 3D trefoil knot visualization</li>
+                <li>✅ Real-time parameter controls</li>
+                <li>✅ Responsive design for mobile and desktop</li>
+                <li>✅ Draggable control panels</li>
+                <li>✅ Glassmorphism UI effects</li>
+                <li>✅ CDN fallback system for Three.js</li>
+                <li>✅ SEO optimization and meta tags</li>
+                <li>✅ PWA manifest for mobile installation</li>
+                <li>✅ Custom error pages and .htaccess optimization</li>
+            </ul>
+        </div>
+        
+        <div class="deploy-info">
+            <h3>🚀 SiteGround Deployment</h3>
+            <p>Upload all project files to your SiteGround hosting public_html directory. The application will work with external CDNs for Three.js library.</p>
+            <p>See <strong>DEPLOYMENT.md</strong> for detailed instructions.</p>
+        </div>
+        
+        <div class="links">
+            <a href="index.html">Main Application</a>
+            <a href="trefoil_knot.html">Legacy Version</a>
+            <a href="DEPLOYMENT.md">Deployment Guide</a>
+        </div>
+        
+        <div style="margin-top: 30px; font-size: 14px; color: #666;">
+            <p><strong>Tansu Özçelebi</strong> - 2025</p>
+            <p>Built with ❤️ and lots of mathematics</p>
+        </div>
+    </div>
+</body>
+</html>
