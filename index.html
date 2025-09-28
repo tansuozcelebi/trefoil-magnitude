@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trefoil Knot - Clean Interface</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="container"></div>
+    
+    <!-- Info Button -->
+    <div class="panel info-button" id="info-btn">ℹ️</div>
+    
+    <!-- Controls Hint -->
+    <div class="panel controls-hint">
+        🖱️ Drag • 🖱️ Scroll • 👆 Touch
+    </div>
+
+    <!-- Info Modal -->
+    <div class="info-modal" id="info-modal">
+        <div class="info-content">
+            <button class="info-close" id="info-close">×</button>
+            <div class="info-name">Tansu Özçelebi</div>
+            <div class="info-year">2025</div>
+        </div>
+    </div>
+
+    <!-- Compact Controls will be injected by controls.js -->
+
+    <!-- Speed Control -->
+    <div class="panel speed-panel">
+        <label for="rotation-speed">Speed: <span id="rotation-speed-val">1.0</span></label>
+        <input type="range" id="rotation-speed" min="0" max="3" step="0.1" value="1">
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="controls.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0);
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0x4a9eff, 0.8);
+        directionalLight.position.set(10, 10, 5);
+        scene.add(directionalLight);
+
+        const pointLight = new THREE.PointLight(0xff6b35, 0.6);
+        pointLight.position.set(-10, -10, 10);
+        scene.add(pointLight);
+
+        // Mouse orbit controls
+        const mouse = { 
+            isDown: false, 
+            prevX: 0, 
+            prevY: 0,
+            spherical: new THREE.Spherical(12, Math.PI / 3, Math.PI / 4)
+        };
+
+        // Parameters
+        let params = {
+            magnitude: 2.0,
+            paramA: 0.5,
+            paramB: 0.5,
+            frequency: 1.0,
+            baseRadius: 0.15,
+            radiusVariation: 1.0,
+            variationFreq: 3.0,
+            rotationSpeed: 1.0,
+            segments: 200
+        };
+
+        let trefoilMesh;
+
+        // Trefoil knot equations
+        function trefoilKnot(t) {
+            const { magnitude, paramA, paramB, frequency } = params;
+            
+            if (isNaN(t) || isNaN(magnitude) || isNaN(paramA) || isNaN(paramB) || isNaN(frequency)) {
+                return new THREE.Vector3(0, 0, 0);
+            }
+            
+            const ft = frequency * t;
+            const x = magnitude * (Math.sin(ft) + paramA * Math.sin(3 * ft));
+            const y = magnitude * (Math.cos(ft) - paramA * Math.cos(3 * ft));
+            const z = magnitude * paramB * Math.sin(2 * ft);
+            
+            if (isNaN(x) || isNaN(y) || isNaN(z)) {
+                return new THREE.Vector3(0, 0, 0);
+            }
+            
+            return new THREE.Vector3(x, y, z);
+        }
+
+        // Variable radius function
+        function getRadius(u) {
+            const { baseRadius, radiusVariation, variationFreq, magnitude } = params;
+            
+            if (isNaN(u) || u < 0) return baseRadius;
+            
+            const t = u * 2 * Math.PI;
+            const magnitudeEffect = 1 + Math.max(0, (magnitude - 2)) * 0.2;
+            const sinVariation = Math.sin(variationFreq * t) * 0.5 + 0.5;
+            const radius = baseRadius * magnitudeEffect * (1 + radiusVariation * sinVariation * 0.5);
+            const finalRadius = Math.max(radius, 0.02);
+            
+            return isNaN(finalRadius) ? baseRadius : finalRadius;
+        }
+
+        // Create trefoil curve
+        function createTrefoilCurve() {
+            const points = [];
+            
+            for (let i = 0; i <= params.segments; i++) {
+                const t = (i / params.segments) * 2 * Math.PI;
+                const point = trefoilKnot(t);
+                
+                if (point && !isNaN(point.x) && !isNaN(point.y) && !isNaN(point.z)) {
+                    points.push(point);
+                } else {
+                    points.push(points.length > 0 ? points[points.length - 1].clone() : new THREE.Vector3(0, 0, 0));
+                }
+            }
+            
+            if (points.length < 2) {
+                points.push(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0));
+            }
+            
+            return new THREE.CatmullRomCurve3(points, true);
+        }
+
+        // Create variable tube geometry
+        function createVariableTubeGeometry(curve, tubularSegments, radialSegments) {
+            const vertices = [];
+            const normals = [];
+            const uvs = [];
+            const indices = [];
+
+            try {
+                const frames = curve.computeFrenetFrames(tubularSegments, true);
+
+                for (let i = 0; i <= tubularSegments; i++) {
+                    const u = i / tubularSegments;
+                    const P = curve.getPointAt(u);
+                    const radius = getRadius(u);
+                    
+                    if (!P || isNaN(P.x) || isNaN(P.y) || isNaN(P.z) || isNaN(radius)) {
+                        continue;
+                    }
+                    
+                    const T = frames.tangents[i];
+                    const N = frames.normals[i];
+                    const B = frames.binormals[i];
+
+                    if (!T || !N || !B || isNaN(T.x) || isNaN(N.x) || isNaN(B.x)) {
+                        continue;
+                    }
+
+                    for (let j = 0; j <= radialSegments; j++) {
+                        const v = j / radialSegments * Math.PI * 2;
+                        const sin = Math.sin(v);
+                        const cos = Math.cos(v);
+                        
+                        const normal = new THREE.Vector3();
+                        normal.x = (cos * N.x + sin * B.x);
+                        normal.y = (cos * N.y + sin * B.y);
+                        normal.z = (cos * N.z + sin * B.z);
+                        normal.normalize();
+
+                        const vertex = new THREE.Vector3();
+                        vertex.x = P.x + radius * normal.x;
+                        vertex.y = P.y + radius * normal.y;
+                        vertex.z = P.z + radius * normal.z;
+
+                        if (isNaN(vertex.x) || isNaN(vertex.y) || isNaN(vertex.z)) {
+                            vertex.set(0, 0, 0);
+                        }
+
+                        vertices.push(vertex.x, vertex.y, vertex.z);
+                        normals.push(normal.x, normal.y, normal.z);
+                        uvs.push(u, v / (Math.PI * 2));
+                    }
+                }
+
+                // Generate indices
+                for (let i = 0; i < tubularSegments; i++) {
+                    for (let j = 0; j < radialSegments; j++) {
+                        const a = (radialSegments + 1) * i + j;
+                        const b = (radialSegments + 1) * (i + 1) + j;
+                        const c = (radialSegments + 1) * (i + 1) + j + 1;
+                        const d = (radialSegments + 1) * i + j + 1;
+
+                        indices.push(a, b, d);
+                        indices.push(b, c, d);
+                    }
+                }
+
+                const geometry = new THREE.BufferGeometry();
+                geometry.setIndex(indices);
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+                geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+
+                return geometry;
+            } catch (error) {
+                console.error('Error creating variable tube geometry:', error);
+                return new THREE.TubeGeometry(curve, tubularSegments, 0.2, radialSegments, true);
+            }
+        }
+
+        // Create trefoil mesh
+        function createTrefoilMesh() {
+            try {
+                if (trefoilMesh) {
+                    scene.remove(trefoilMesh);
+                }
+
+                const curve = createTrefoilCurve();
+                const geometry = createVariableTubeGeometry(curve, params.segments, 16);
+                
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0x4a9eff,
+                    shininess: 100,
+                    specular: 0x222222,
+                    transparent: true,
+                    opacity: 0.9
+                });
+
+                // Add color variation
+                const positions = geometry.attributes.position;
+                const colors = new Float32Array(positions.count * 3);
+                
+                for (let i = 0; i < positions.count; i++) {
+                    const x = positions.getX(i);
+                    const y = positions.getY(i);
+                    const z = positions.getZ(i);
+                    
+                    if (isNaN(x) || isNaN(y) || isNaN(z)) continue;
+                    
+                    const distance = Math.sqrt(x*x + y*y + z*z);
+                    const normalizedDist = distance / Math.max(params.magnitude * 3, 1);
+                    
+                    colors[i * 3] = 0.3 + normalizedDist * 0.4;
+                    colors[i * 3 + 1] = 0.6 + Math.sin(normalizedDist * Math.PI) * 0.4;
+                    colors[i * 3 + 2] = 1.0 - normalizedDist * 0.3;
+                }
+                
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                material.vertexColors = true;
+
+                trefoilMesh = new THREE.Mesh(geometry, material);
+                
+                // Add wireframe
+                const wireframeGeometry = geometry.clone();
+                const wireframeMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.1
+                });
+                const wireframe = new THREE.Mesh(wireframeGeometry, wireframeMaterial);
+                trefoilMesh.add(wireframe);
+
+                scene.add(trefoilMesh);
+            } catch (error) {
+                console.error('Error creating trefoil mesh:', error);
+                const fallbackGeometry = new THREE.TorusGeometry(2, 0.3, 16, 100);
+                const fallbackMaterial = new THREE.MeshPhongMaterial({ color: 0x4a9eff });
+                trefoilMesh = new THREE.Mesh(fallbackGeometry, fallbackMaterial);
+                scene.add(trefoilMesh);
+            }
+        }
+
+        // Update camera position
+        function updateCameraPosition() {
+            const position = new THREE.Vector3();
+            position.setFromSpherical(mouse.spherical);
+            camera.position.copy(position);
+            camera.lookAt(0, 0, 0);
+        }
+
+        // Mouse & Touch controls for canvas only
+        const canvas = renderer.domElement;
+        
+        // Mouse events
+        canvas.addEventListener('mousedown', (event) => {
+            // Only start orbit if not clicking on a panel
+            if (event.target === canvas) {
+                mouse.isDown = true;
+                mouse.prevX = event.clientX;
+                mouse.prevY = event.clientY;
+                canvas.style.cursor = 'grabbing';
+            }
+        });
+
+        document.addEventListener('mousemove', (event) => {
+            if (!mouse.isDown) return;
+
+            const deltaX = event.clientX - mouse.prevX;
+            const deltaY = event.clientY - mouse.prevY;
+
+            mouse.spherical.theta -= deltaX * 0.01;
+            mouse.spherical.phi += deltaY * 0.01;
+            mouse.spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, mouse.spherical.phi));
+
+            updateCameraPosition();
+
+            mouse.prevX = event.clientX;
+            mouse.prevY = event.clientY;
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (mouse.isDown) {
+                mouse.isDown = false;
+                canvas.style.cursor = 'grab';
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            mouse.isDown = false;
+            canvas.style.cursor = 'grab';
+        });
+
+        // Touch events for mobile (canvas only)
+        canvas.addEventListener('touchstart', (event) => {
+            if (event.target === canvas) {
+                event.preventDefault();
+                const touch = event.touches[0];
+                mouse.isDown = true;
+                mouse.prevX = touch.clientX;
+                mouse.prevY = touch.clientY;
+            }
+        });
+
+        document.addEventListener('touchmove', (event) => {
+            if (!mouse.isDown) return;
+            
+            // Only handle single touch for orbit
+            if (event.touches.length === 1) {
+                const touch = event.touches[0];
+                const deltaX = touch.clientX - mouse.prevX;
+                const deltaY = touch.clientY - mouse.prevY;
+
+                mouse.spherical.theta -= deltaX * 0.01;
+                mouse.spherical.phi += deltaY * 0.01;
+                mouse.spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, mouse.spherical.phi));
+
+                updateCameraPosition();
+
+                mouse.prevX = touch.clientX;
+                mouse.prevY = touch.clientY;
+            }
+        });
+
+        document.addEventListener('touchend', (event) => {
+            if (mouse.isDown && event.touches.length === 0) {
+                mouse.isDown = false;
+            }
+        });
+
+        // Pinch to zoom for mobile
+        let lastTouchDistance = 0;
+        canvas.addEventListener('touchstart', (event) => {
+            if (event.touches.length === 2) {
+                const dx = event.touches[0].clientX - event.touches[1].clientX;
+                const dy = event.touches[0].clientY - event.touches[1].clientY;
+                lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
+            }
+        });
+
+        canvas.addEventListener('touchmove', (event) => {
+            if (event.touches.length === 2) {
+                event.preventDefault();
+                const dx = event.touches[0].clientX - event.touches[1].clientX;
+                const dy = event.touches[0].clientY - event.touches[1].clientY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (lastTouchDistance > 0) {
+                    const delta = (distance - lastTouchDistance) * -0.1;
+                    mouse.spherical.radius += delta;
+                    mouse.spherical.radius = Math.max(2, Math.min(30, mouse.spherical.radius));
+                    updateCameraPosition();
+                }
+                
+                lastTouchDistance = distance;
+            }
+        });
+
+        // Mouse wheel
+        canvas.addEventListener('wheel', (event) => {
+            event.preventDefault();
+            mouse.spherical.radius += event.deltaY * 0.01;
+            mouse.spherical.radius = Math.max(2, Math.min(30, mouse.spherical.radius));
+            updateCameraPosition();
+        });
+
+        canvas.style.cursor = 'grab';
+
+        // Panel dragging functionality
+        function makeDraggable(element) {
+            let isDragging = false;
+            let startX = 0;
+            let startY = 0;
+            let initialX = 0;
+            let initialY = 0;
+
+            // Find drag handle if it exists
+            const dragHandle = element.querySelector('.drag-handle');
+            const dragTarget = dragHandle || element;
+
+            // Mouse events
+            dragTarget.addEventListener('mousedown', (e) => {
+                // For panels with drag handle, only allow dragging from the handle
+                if (dragHandle && !e.target.closest('.drag-handle')) return;
+                // Don't drag if clicking on controls
+                if (e.target.type === 'range' || e.target.tagName === 'BUTTON') return;
+                
+                isDragging = true;
+                element.classList.add('dragging');
+                
+                startX = e.clientX;
+                startY = e.clientY;
+                
+                const rect = element.getBoundingClientRect();
+                initialX = rect.left;
+                initialY = rect.top;
+                
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+                
+                const newX = Math.max(0, Math.min(window.innerWidth - element.offsetWidth, initialX + deltaX));
+                const newY = Math.max(0, Math.min(window.innerHeight - element.offsetHeight, initialY + deltaY));
+                
+                element.style.left = newX + 'px';
+                element.style.top = newY + 'px';
+                element.style.right = 'auto';
+                element.style.bottom = 'auto';
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    element.classList.remove('dragging');
+                }
+            });
+
+            // Touch events for mobile
+            dragTarget.addEventListener('touchstart', (e) => {
+                // For panels with drag handle, only allow dragging from the handle
+                if (dragHandle && !e.target.closest('.drag-handle')) return;
+                if (e.target.type === 'range' || e.target.tagName === 'BUTTON') return;
+                
+                isDragging = true;
+                element.classList.add('dragging');
+                
+                const touch = e.touches[0];
+                startX = touch.clientX;
+                startY = touch.clientY;
+                
+                const rect = element.getBoundingClientRect();
+                initialX = rect.left;
+                initialY = rect.top;
+                
+                e.preventDefault();
+            });
+
+            document.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                
+                const touch = e.touches[0];
+                const deltaX = touch.clientX - startX;
+                const deltaY = touch.clientY - startY;
+                
+                const newX = Math.max(0, Math.min(window.innerWidth - element.offsetWidth, initialX + deltaX));
+                const newY = Math.max(0, Math.min(window.innerHeight - element.offsetHeight, initialY + deltaY));
+                
+                element.style.left = newX + 'px';
+                element.style.top = newY + 'px';
+                element.style.right = 'auto';
+                element.style.bottom = 'auto';
+                
+                e.preventDefault();
+            });
+
+            document.addEventListener('touchend', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    element.classList.remove('dragging');
+                }
+            });
+        }
+
+        // Info modal functionality
+        const infoBtn = document.getElementById('info-btn');
+        const infoModal = document.getElementById('info-modal');
+        const infoClose = document.getElementById('info-close');
+
+        // Special handling for info button (click vs drag)
+        let infoClickTimeout;
+        let infoMoved = false;
+
+        infoBtn.addEventListener('mousedown', () => {
+            infoMoved = false;
+        });
+
+        infoBtn.addEventListener('mousemove', () => {
+            infoMoved = true;
+        });
+
+        infoBtn.addEventListener('mouseup', () => {
+            if (!infoMoved) {
+                infoModal.classList.add('show');
+            }
+        });
+
+        infoBtn.addEventListener('touchend', (e) => {
+            if (!infoMoved) {
+                e.preventDefault();
+                infoModal.classList.add('show');
+            }
+        });
+
+        infoClose.addEventListener('click', () => {
+            infoModal.classList.remove('show');
+        });
+
+        infoModal.addEventListener('click', (event) => {
+            if (event.target === infoModal) {
+                infoModal.classList.remove('show');
+            }
+        });
+
+        // Setup controls
+        let controlPanel;
+        
+        // Initialize control panel after trefoil mesh function is defined
+        function initializeControls() {
+            controlPanel = new ControlPanel(params, createTrefoilMesh);
+            
+            // Make all panels draggable (including the newly created control panel)
+            const draggablePanels = document.querySelectorAll('.panel');
+            draggablePanels.forEach(panel => {
+                makeDraggable(panel);
+            });
+            
+            // Setup speed control separately (it's not part of the main control panel)
+            const speedSlider = document.getElementById('rotation-speed');
+            const speedDisplay = document.getElementById('rotation-speed-val');
+            
+            if (speedSlider && speedDisplay) {
+                speedSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    if (isNaN(value)) return;
+                    
+                    params.rotationSpeed = value;
+                    speedDisplay.textContent = value.toFixed(1);
+                });
+                
+                speedDisplay.textContent = params.rotationSpeed.toFixed(1);
+            }
+        }
+
+        // Initialize
+        createTrefoilMesh();
+        initializeControls();
+        updateCameraPosition();
+
+        // Animation
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (trefoilMesh && params.rotationSpeed > 0) {
+                trefoilMesh.rotation.x += 0.005 * params.rotationSpeed;
+                trefoilMesh.rotation.y += 0.01 * params.rotationSpeed;
+                trefoilMesh.rotation.z += 0.003 * params.rotationSpeed;
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
