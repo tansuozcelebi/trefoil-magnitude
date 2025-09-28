@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trefoil Knot - Clean Interface</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="container"></div>
+    
+    <!-- Info Button -->
+    <div class="panel info-button" id="info-btn">ℹ️</div>
+    
+    <!-- Controls Hint -->
+    <div class="panel controls-hint">
+        🖱️ Drag • 🖱️ Scroll • 👆 Touch
+    </div>
+
+    <!-- Info Modal -->
+    <div class="info-modal" id="info-modal">
+        <div class="info-content">
+            <button class="info-close" id="info-close">×</button>
+            <div class="info-name">Tansu Özçelebi</div>
+            <div class="info-year">2025</div>
+        </div>
+    </div>
+
+    <!-- Compact Controls will be injected by controls.js -->
+
+    <!-- Speed Control -->
+    <div class="panel speed-panel">
+        <label for="rotation-speed">Speed: <span id="rotation-speed-val">1.0</span></label>
+        <input type="range" id="rotation-speed" min="0" max="3" step="0.1" value="1.0">
+    </div>
+
+    <script src="three-simple.js"></script>
+    <script src="controls.js"></script>
+    
+    <script>
+        // Three.js scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0x4a9eff, 0.8);
+        directionalLight.position.set(10, 10, 5);
+        scene.add(directionalLight);
+
+        const pointLight = new THREE.PointLight(0xff6b35, 0.6);
+        pointLight.position.set(-10, -10, 10);
+        scene.add(pointLight);
+
+        // Mouse orbit controls
+        const mouse = { 
+            isDown: false, 
+            prevX: 0, 
+            prevY: 0,
+            spherical: new THREE.Spherical(12, Math.PI / 3, Math.PI / 4)
+        };
+
+        // Parameters
+        let params = {
+            magnitude: 2.0,
+            paramA: 0.5,
+            paramB: 0.5,
+            frequency: 1.0,
+            baseRadius: 0.15,
+            radiusVariation: 1.0,
+            variationFreq: 3.0,
+            rotationSpeed: 1.0,
+            segments: 200
+        };
+
+        let trefoilMesh;
+
+        // Trefoil knot equations
+        function trefoilKnot(t) {
+            const { magnitude, paramA, paramB, frequency } = params;
+            
+            if (isNaN(t) || isNaN(magnitude) || isNaN(paramA) || isNaN(paramB) || isNaN(frequency)) {
+                return new THREE.Vector3(0, 0, 0);
+            }
+            
+            const ft = frequency * t;
+            const x = magnitude * (Math.sin(ft) + paramA * Math.sin(3 * ft));
+            const y = magnitude * (Math.cos(ft) - paramA * Math.cos(3 * ft));
+            const z = magnitude * paramB * Math.sin(2 * ft);
+            
+            if (isNaN(x) || isNaN(y) || isNaN(z)) {
+                return new THREE.Vector3(0, 0, 0);
+            }
+            
+            return new THREE.Vector3(x, y, z);
+        }
+
+        // Variable radius function
+        function getRadius(u) {
+            const { baseRadius, radiusVariation, variationFreq, magnitude } = params;
+            
+            if (isNaN(u) || isNaN(baseRadius) || isNaN(radiusVariation) || isNaN(variationFreq) || isNaN(magnitude)) {
+                return 0.15;
+            }
+            
+            const variation = 1 + radiusVariation * 0.1 * Math.sin(variationFreq * u * Math.PI);
+            const sizeScale = Math.max(0.1, magnitude / 3);
+            
+            return Math.max(0.01, baseRadius * variation * sizeScale);
+        }
+
+        // Create trefoil curve
+        function createTrefoilCurve() {
+            const curve = new THREE.Curve();
+            
+            curve.getPoint = function(t) {
+                const angle = t * 2 * Math.PI;
+                return trefoilKnot(angle);
+            };
+            
+            return curve;
+        }
+
+        // Create variable tube geometry
+        function createVariableTubeGeometry(curve, tubularSegments, radialSegments) {
+            try {
+                const vertices = [];
+                const normals = [];
+                const uvs = [];
+                const indices = [];
+
+                const frames = new THREE.TubeGeometry(curve, tubularSegments, 1, radialSegments, true).parameters;
+                
+                for (let i = 0; i <= tubularSegments; i++) {
+                    const u = i / tubularSegments;
+                    const point = curve.getPoint(u);
+                    const radius = getRadius(u);
+                    
+                    const nextU = Math.min(1, (i + 1) / tubularSegments);
+                    const nextPoint = curve.getPoint(nextU);
+                    const tangent = new THREE.Vector3().subVectors(nextPoint, point).normalize();
+                    
+                    let normal = new THREE.Vector3(0, 1, 0);
+                    if (Math.abs(tangent.dot(normal)) > 0.9) {
+                        normal = new THREE.Vector3(1, 0, 0);
+                    }
+                    
+                    const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+                    normal = new THREE.Vector3().crossVectors(binormal, tangent).normalize();
+                    
+                    for (let j = 0; j <= radialSegments; j++) {
+                        const v = j / radialSegments;
+                        const angle = v * Math.PI * 2;
+                        
+                        const cos = Math.cos(angle);
+                        const sin = Math.sin(angle);
+                        
+                        const x = point.x + radius * (cos * normal.x + sin * binormal.x);
+                        const y = point.y + radius * (cos * normal.y + sin * binormal.y);
+                        const z = point.z + radius * (cos * normal.z + sin * binormal.z);
+                        
+                        vertices.push(x, y, z);
+                        
+                        const nx = cos * normal.x + sin * binormal.x;
+                        const ny = cos * normal.y + sin * binormal.y;
+                        const nz = cos * normal.z + sin * binormal.z;
+                        normals.push(nx, ny, nz);
+                        
+                        uvs.push(u, v);
+                        
+                        if (i < tubularSegments && j < radialSegments) {
+                            const a = i * (radialSegments + 1) + j;
+                            const b = (i + 1) * (radialSegments + 1) + j;
+                            const c = (i + 1) * (radialSegments + 1) + (j + 1);
+                            const d = i * (radialSegments + 1) + (j + 1);
+                            
+                            indices.push(a, b, d);
+                            indices.push(b, c, d);
+                        }
+                    }
+                }
+
+                const geometry = new THREE.BufferGeometry();
+                geometry.setIndex(indices);
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+                geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+
+                return geometry;
+            } catch (error) {
+                console.error('Error creating variable tube geometry:', error);
+                return new THREE.TubeGeometry(curve, tubularSegments, 0.2, radialSegments, true);
+            }
+        }
+
+        // Create trefoil mesh
+        function createTrefoilMesh() {
+            try {
+                if (trefoilMesh) {
+                    scene.remove(trefoilMesh);
+                }
+
+                const curve = createTrefoilCurve();
+                const geometry = createVariableTubeGeometry(curve, params.segments, 16);
+                
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0x4a9eff,
+                    shininess: 100,
+                    specular: 0x222222,
+                    transparent: true,
+                    opacity: 0.9
+                });
+
+                // Add color variation
+                const positions = geometry.attributes.position;
+                const colors = new Float32Array(positions.count * 3);
+                
+                for (let i = 0; i < positions.count; i++) {
+                    const x = positions.getX(i);
+                    const y = positions.getY(i);
+                    const z = positions.getZ(i);
+                    
+                    const distance = Math.sqrt(x*x + y*y + z*z);
+                    const hue = (distance / 6) % 1;
+                    
+                    const color = new THREE.Color().setHSL(hue * 0.3 + 0.55, 0.7, 0.6);
+                    colors[i*3] = color.r;
+                    colors[i*3+1] = color.g;
+                    colors[i*3+2] = color.b;
+                }
+                
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                material.vertexColors = true;
+
+                trefoilMesh = new THREE.Mesh(geometry, material);
+
+                // Add wireframe overlay
+                const wireframeGeometry = geometry.clone();
+                const wireframeMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.1
+                });
+                const wireframe = new THREE.Mesh(wireframeGeometry, wireframeMaterial);
+                trefoilMesh.add(wireframe);
+
+                scene.add(trefoilMesh);
+            } catch (error) {
+                console.error('Error creating trefoil mesh:', error);
+                const fallbackGeometry = new THREE.TorusGeometry(2, 0.3, 16, 100);
+                const fallbackMaterial = new THREE.MeshPhongMaterial({ color: 0x4a9eff });
+                trefoilMesh = new THREE.Mesh(fallbackGeometry, fallbackMaterial);
+                scene.add(trefoilMesh);
+            }
+        }
+
+        // Update camera position
+        function updateCameraPosition() {
+            const position = new THREE.Vector3();
+            position.setFromSpherical(mouse.spherical);
+            camera.position.copy(position);
+            camera.lookAt(0, 0, 0);
+        }
+
+        // Mouse & Touch controls for canvas only
+        const canvas = renderer.domElement;
+        
+        // Mouse events
+        canvas.addEventListener('mousedown', (event) => {
+            mouse.isDown = true;
+            mouse.prevX = event.clientX;
+            mouse.prevY = event.clientY;
+        });
+
+        canvas.addEventListener('mousemove', (event) => {
+            if (mouse.isDown) {
+                const deltaX = event.clientX - mouse.prevX;
+                const deltaY = event.clientY - mouse.prevY;
+                
+                mouse.spherical.theta -= deltaX * 0.01;
+                mouse.spherical.phi += deltaY * 0.01;
+                mouse.spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, mouse.spherical.phi));
+                
+                updateCameraPosition();
+                
+                mouse.prevX = event.clientX;
+                mouse.prevY = event.clientY;
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            mouse.isDown = false;
+        });
+
+        canvas.addEventListener('wheel', (event) => {
+            event.preventDefault();
+            mouse.spherical.radius += event.deltaY * 0.01;
+            mouse.spherical.radius = Math.max(2, Math.min(50, mouse.spherical.radius));
+            updateCameraPosition();
+        });
+
+        // Touch events
+        let touchStartX, touchStartY;
+        
+        canvas.addEventListener('touchstart', (event) => {
+            if (event.touches.length === 1) {
+                touchStartX = event.touches[0].clientX;
+                touchStartY = event.touches[0].clientY;
+                mouse.isDown = true;
+            }
+        });
+
+        canvas.addEventListener('touchmove', (event) => {
+            event.preventDefault();
+            if (mouse.isDown && event.touches.length === 1) {
+                const deltaX = event.touches[0].clientX - touchStartX;
+                const deltaY = event.touches[0].clientY - touchStartY;
+                
+                mouse.spherical.theta -= deltaX * 0.01;
+                mouse.spherical.phi += deltaY * 0.01;
+                mouse.spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, mouse.spherical.phi));
+                
+                updateCameraPosition();
+                
+                touchStartX = event.touches[0].clientX;
+                touchStartY = event.touches[0].clientY;
+            }
+        });
+
+        canvas.addEventListener('touchend', () => {
+            mouse.isDown = false;
+        });
+
+        // Draggable functionality
+        function makeDraggable(element) {
+            let isDragging = false;
+            let startX, startY, initialX, initialY;
+
+            function handleStart(e) {
+                isDragging = true;
+                element.classList.add('dragging');
+                
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                startX = clientX;
+                startY = clientY;
+                initialX = parseFloat(element.style.left) || 0;
+                initialY = parseFloat(element.style.top) || 0;
+                
+                e.preventDefault();
+            }
+
+            function handleMove(e) {
+                if (!isDragging) return;
+                
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                const deltaX = clientX - startX;
+                const deltaY = clientY - startY;
+                
+                element.style.left = (initialX + deltaX) + 'px';
+                element.style.top = (initialY + deltaY) + 'px';
+                
+                e.preventDefault();
+            }
+
+            function handleEnd() {
+                isDragging = false;
+                element.classList.remove('dragging');
+            }
+
+            // Mouse events
+            element.addEventListener('mousedown', handleStart);
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleEnd);
+
+            // Touch events
+            element.addEventListener('touchstart', handleStart);
+            document.addEventListener('touchmove', handleMove, { passive: false });
+            document.addEventListener('touchend', handleEnd);
+        }
+
+        // Initialize draggable functionality for all panels
+        const draggablePanels = document.querySelectorAll('.panel');
+        draggablePanels.forEach(panel => {
+            makeDraggable(panel);
+        });
+
+        // Info modal functionality
+        const infoBtn = document.getElementById('info-btn');
+        const infoModal = document.getElementById('info-modal');
+        const infoClose = document.getElementById('info-close');
+        let infoMoved = false;
+
+        infoBtn.addEventListener('mousedown', () => {
+            infoMoved = false;
+        });
+
+        infoBtn.addEventListener('mousemove', () => {
+            infoMoved = true;
+        });
+
+        infoBtn.addEventListener('click', () => {
+            if (!infoMoved) {
+                infoModal.classList.add('show');
+            }
+        });
+
+        infoBtn.addEventListener('touchend', (e) => {
+            if (!infoMoved) {
+                e.preventDefault();
+                infoModal.classList.add('show');
+            }
+        });
+
+        infoClose.addEventListener('click', () => {
+            infoModal.classList.remove('show');
+        });
+
+        infoModal.addEventListener('click', (event) => {
+            if (event.target === infoModal) {
+                infoModal.classList.remove('show');
+            }
+        });
+
+        // Setup controls
+        let controlPanel;
+        
+        // Initialize control panel after trefoil mesh function is defined
+        function initializeControls() {
+            controlPanel = new ControlPanel(params, createTrefoilMesh);
+            
+            // Make all panels draggable (including the newly created control panel)
+            const draggablePanels = document.querySelectorAll('.panel');
+            draggablePanels.forEach(panel => {
+                makeDraggable(panel);
+            });
+            
+            // Setup speed control separately (it's not part of the main control panel)
+            const speedSlider = document.getElementById('rotation-speed');
+            const speedDisplay = document.getElementById('rotation-speed-val');
+            
+            if (speedSlider && speedDisplay) {
+                speedSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    if (isNaN(value)) return;
+                    
+                    params.rotationSpeed = value;
+                    speedDisplay.textContent = value.toFixed(1);
+                });
+                
+                speedDisplay.textContent = params.rotationSpeed.toFixed(1);
+            }
+        }
+
+        // Initialize
+        createTrefoilMesh();
+        initializeControls();
+        updateCameraPosition();
+
+        // Animation
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (trefoilMesh && params.rotationSpeed > 0) {
+                trefoilMesh.rotation.x += 0.005 * params.rotationSpeed;
+                trefoilMesh.rotation.y += 0.01 * params.rotationSpeed;
+                trefoilMesh.rotation.z += 0.003 * params.rotationSpeed;
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
